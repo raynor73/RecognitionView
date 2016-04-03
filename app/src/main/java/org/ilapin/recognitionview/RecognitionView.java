@@ -34,13 +34,14 @@ public class RecognitionView extends View {
 	private final static float STROKE_WIDTH = 2; //dp
 	private final static int END_DRAWING_TIMEOUT = 500; //millis
 
+//	private
+
 	private State mState = State.IDLE;
 
 	private Listener mListener;
 
 	private final Path mPath = new Path();
 	private Paint mPaint = new Paint();
-	private final Paint mDimmingPaint = new Paint();
 
 	private final List<List<PointF>> mSegments = new ArrayList<>();
 
@@ -80,6 +81,14 @@ public class RecognitionView extends View {
 
 	public void setPaint(final Paint paint) {
 		mPaint = paint;
+	}
+
+	public void setListener(final Listener listener) {
+		mListener = listener;
+	}
+
+	public void heavyInit() {
+
 	}
 
 	@Override
