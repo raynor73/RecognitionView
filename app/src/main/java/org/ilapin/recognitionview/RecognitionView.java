@@ -277,9 +277,10 @@ public class RecognitionView extends View {
 			}
 
 			final double[] inputs = new double[RECOGNIZED_IMAGE_ROWS * RECOGNIZED_IMAGE_COLUMNS];
-			for (int j = 0; j < RECOGNIZED_IMAGE_COLUMNS; j++) {
-				for (int i = 0; i < RECOGNIZED_IMAGE_ROWS; i++) {
-					inputs[i * RECOGNIZED_IMAGE_COLUMNS + j] = 0xff - (bitmap.getPixel(i, j) & 0xff);
+			for (int i = 0; i < RECOGNIZED_IMAGE_ROWS; i++) {
+				for (int j = 0; j < RECOGNIZED_IMAGE_COLUMNS; j++) {
+					final int pixelColor = bitmap.getPixel(i, j);
+					inputs[i * RECOGNIZED_IMAGE_COLUMNS + j] = ((pixelColor & 0xff000000) >>> 24) == 0 ? 0 : 0xff - (pixelColor & 0xff);
 				}
 			}
 
