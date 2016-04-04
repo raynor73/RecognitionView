@@ -16,16 +16,26 @@
 package org.ilapin.recognitionview;
 
 import android.content.Context;
+import android.content.res.AssetManager;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 
+import org.ilapin.matrix.MatrixLoader;
+import org.ilapin.matrix.MatrixUtils;
+import org.ilapin.neuralnetwork.NeuralNetwork;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,8 +43,10 @@ public class RecognitionView extends View {
 
 	private final static float STROKE_WIDTH = 2; //dp
 	private final static int END_DRAWING_TIMEOUT = 500; //millis
+	private final static int RECOGNIZED_IMAGE_ROWS = 28;
+	private final static int RECOGNIZED_IMAGE_COLUMNS = 28;
 
-//	private
+	private static NeuralNetwork sNeuralNetwork;
 
 	private State mState = State.IDLE;
 
@@ -55,6 +67,24 @@ public class RecognitionView extends View {
 			new RecognitionTask().execute();
 		}
 	};
+
+	private Bitmap buildBitmapForRecognition() {
+		final Paint paint = new Paint();
+		paint.setColor(0xff000000);
+		paint.setStrokeWidth(0);
+		paint.setStyle(Paint.Style.STROKE);
+		final Bitmap bitmap = Bitmap.createBitmap(RECOGNIZED_IMAGE_COLUMNS, RECOGNIZED_IMAGE_ROWS,
+				Bitmap.Config.ARGB_8888);
+		final Canvas canvas = new Canvas(bitmap);
+
+		final Matrix matrix = new Matrix();
+		matrix.reset();
+		matrix.setScale((float) RECOGNIZED_IMAGE_COLUMNS / getWidth(), (float) RECOGNIZED_IMAGE_ROWS / getHeight());
+
+		drawPath(canvas, paint, matrix);
+
+		return bitmap;
+	}
 
 	public RecognitionView(final Context context) {
 		this(context, null, 0);
@@ -88,7 +118,37 @@ public class RecognitionView extends View {
 	}
 
 	public void heavyInit() {
-
+		final AssetManager assetManager = getContext().getAssets();
+		final double[][] inputLayerWeights, layerWeights, inputBiases, layerBiases, gain, keep, xOffset;
+		try {
+			inputLayerWeights = MatrixLoader.load(assetManager.open("input_layer_weights"));
+			layerWeights = MatrixLoader.load(assetManager.open("layer_weights"));
+			inputBiases = MatrixLoader.load(assetManager.open("input_biases"));
+			layerBiases = MatrixLoader.load(assetManager.open("layer_biases"));
+			gain = MatrixLoader.load(assetManager.open("gain"));
+			keep = MatrixLoader.load(assetManager.open("keep"));
+			xOffset = MatrixLoader.load(assetManager.open("xoffset"));
+		} catch (final IOException e) {
+			throw new RuntimeException(e);
+		}
+		final double[] keepInputsIndexesDoubleArray = MatrixUtils.matrixToVectorArray(keep);
+		final int[] keepInputsIndexes = new int[keepInputsIndexesDoubleArray.length];
+		for (int i = 0; i < keepInputsIndexes.length; i++) {
+			keepInputsIndexes[i] = (int) keepInputsIndexesDoubleArray[i];
+		}
+		sNeuralNetwork = new NeuralNetwork(
+				RECOGNIZED_IMAGE_ROWS * RECOGNIZED_IMAGE_COLUMNS,
+				inputLayerWeights.length,
+				layerWeights.length,
+				keepInputsIndexes
+		);
+		sNeuralNetwork.setInputsWeights(inputLayerWeights);
+		sNeuralNetwork.setInputBiases(inputBiases);
+		sNeuralNetwork.setLayerWeights(layerWeights);
+		sNeuralNetwork.setLayerBiases(layerBiases);
+		sNeuralNetwork.setXOffset(xOffset);
+		sNeuralNetwork.setGain(gain);
+		sNeuralNetwork.setYMin(-1);
 	}
 
 	@Override
@@ -111,11 +171,11 @@ public class RecognitionView extends View {
 	protected void onDraw(final Canvas canvas) {
 		switch (mState) {
 			case DRAWING:
-				drawPath(canvas);
+				drawPath(canvas, mPaint);
 				break;
 
 			case RECOGNIZING:
-				drawPath(canvas);
+				drawPath(canvas, mPaint);
 				applyDimming(canvas);
 				break;
 		}
@@ -132,7 +192,11 @@ public class RecognitionView extends View {
 		canvas.drawARGB(0x80, 0xff, 0xff, 0xff);
 	}
 
-	protected void drawPath(final Canvas canvas) {
+	protected void drawPath(final Canvas canvas, final Paint paint) {
+		drawPath(canvas, paint, new Matrix());
+	}
+
+	protected void drawPath(final Canvas canvas, final Paint paint, final Matrix matrix) {
 		mPath.reset();
 
 		for (final List<PointF> segmentPoints : mSegments) {
@@ -146,7 +210,9 @@ public class RecognitionView extends View {
 			}
 		}
 
-		canvas.drawPath(mPath, mPaint);
+		mPath.transform(matrix);
+
+		canvas.drawPath(mPath, paint);
 	}
 
 	private void processDrawingEvent(final MotionEvent event) {
@@ -188,16 +254,43 @@ public class RecognitionView extends View {
 		mSegments.add(segment);
 	}
 
+	private final Handler mHandler = new Handler(Looper.getMainLooper());
 	private class RecognitionTask extends AsyncTask<Void, Void, String> {
 
 		@Override
+		@SuppressWarnings("ResourceType")
 		protected String doInBackground(final Void... params) {
-			try {
-				Thread.sleep(1000);
-			} catch (final InterruptedException e) {
-				throw new RuntimeException(e);
+			final Bitmap bitmap = buildBitmapForRecognition();
+
+			if (mListener != null) {
+				mHandler.post(new Runnable() {
+
+					@Override
+					public void run() {
+						mListener.onDebugBitmap(bitmap);
+					}
+				});
 			}
-			return "42";
+
+			if (sNeuralNetwork == null) {
+				heavyInit();
+			}
+
+			final double[] inputs = new double[RECOGNIZED_IMAGE_ROWS * RECOGNIZED_IMAGE_COLUMNS];
+			for (int j = 0; j < RECOGNIZED_IMAGE_COLUMNS; j++) {
+				for (int i = 0; i < RECOGNIZED_IMAGE_ROWS; i++) {
+					inputs[i * RECOGNIZED_IMAGE_COLUMNS + j] = 0xff - (bitmap.getPixel(i, j) & 0xff);
+				}
+			}
+
+			final double[] outputs = sNeuralNetwork.calculateOutputs(inputs);
+
+			final StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < outputs.length; i++) {
+				sb.append(String.format("%d: %f", i, outputs[i]));
+			}
+
+			return sb.toString();
 		}
 
 		@Override
@@ -216,6 +309,8 @@ public class RecognitionView extends View {
 		void onStateChanged(final State state);
 
 		void onRecognitionResult(final String result);
+
+		void onDebugBitmap(final Bitmap bitmap);
 	}
 
 	public enum State {

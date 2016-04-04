@@ -17,6 +17,8 @@ package org.ilapin.neuralnetwork;
 
 import org.ilapin.matrix.MatrixUtils;
 
+import java.util.Arrays;
+
 public class NeuralNetwork {
 
 	private final double[][] mInputWeights;
@@ -25,12 +27,13 @@ public class NeuralNetwork {
 	private final double[][] mLayerBiases; // column vector
 	private final double[][] mXOffset; // column vector
 	private final double[][] mGain; // column vector
+	private final int[] mKeepInputsIndexes;
 
 	private double mYMin;
 
 	public NeuralNetwork(final int inputsNumber,
 						 final int inputNeuronsNumber,
-						 final int outputsNumber) {
+						 final int outputsNumber, final int[] keepInputsIndexes) {
 		if (inputsNumber <= 0) {
 			throw new IllegalArgumentException("Inputs number is less than or equal to zero");
 		}
@@ -47,10 +50,16 @@ public class NeuralNetwork {
 		mLayerBiases = new double[outputsNumber][1];
 		mXOffset = new double[inputsNumber][1];
 		mGain = new double[inputsNumber][1];
+		mKeepInputsIndexes = Arrays.copyOf(keepInputsIndexes, keepInputsIndexes.length);
 	}
 
 	public double[] calculateOutputs(final double[] inputs) {
-		final double[][] normalizedInputs = minMaxApply(MatrixUtils.matrixTranspose(inputs), mGain, mXOffset, mYMin);
+		final double[][] filteredInputs = new double[mKeepInputsIndexes.length][1];
+		for (int i = 0; i < filteredInputs.length; i++) {
+			filteredInputs[i][0] = inputs[mKeepInputsIndexes[i]];
+		}
+
+		final double[][] normalizedInputs = minMaxApply(filteredInputs, mGain, mXOffset, mYMin);
 		final double[][] a1 = sigmoidApply(
 				MatrixUtils.matrixSum(mInputBiases, MatrixUtils.matrixMultiply(mInputWeights, normalizedInputs))
 		);
@@ -85,36 +94,36 @@ public class NeuralNetwork {
 		}
 	}
 
-	public void setXOffset(final double[] xOffset) {
-		if (mXOffset.length != xOffset.length) {
+	public void setXOffset(final double[][] xOffset) {  // column vector
+		if (mXOffset.length != xOffset.length && mXOffset[0].length != xOffset[0].length) {
 			throw new IllegalArgumentException("X offsets do not fit neural network");
 		}
 
-		System.arraycopy(xOffset, 0, mXOffset, 0, mXOffset.length);
+		copyColumnVector(xOffset, mXOffset);
 	}
 
-	public void setGain(final double[] gain) {
-		if (mGain.length != gain.length) {
+	public void setGain(final double[][] gain) {
+		if (mGain.length != gain.length && mGain[0].length != gain[0].length) {
 			throw new IllegalArgumentException("Gains do not fit neural network");
 		}
 
-		System.arraycopy(gain, 0, mGain, 0, mGain.length);
+		copyColumnVector(gain, mGain);
 	}
 
-	public void setInputBiases(final double[] biases) {
-		if (mInputBiases.length != biases.length) {
+	public void setInputBiases(final double[][] biases) { // column vector
+		if (mInputBiases.length != biases.length && mInputBiases[0].length != biases[0].length) {
 			throw new IllegalArgumentException("Input biases not fit neural network");
 		}
 
-		System.arraycopy(biases, 0, mInputBiases, 0, mInputBiases.length);
+		copyColumnVector(biases, mInputBiases);
 	}
 
-	public void setLayerBiases(final double[] biases) {
-		if (mLayerBiases.length != biases.length) {
+	public void setLayerBiases(final double[][] biases) {
+		if (mLayerBiases.length != biases.length && mLayerBiases[0].length != biases[0].length) {
 			throw new IllegalArgumentException("Layer biases not fit neural network");
 		}
 
-		System.arraycopy(biases, 0, mLayerBiases, 0, mLayerBiases.length);
+		copyColumnVector(biases, mLayerBiases);
 	}
 
 	private double[][] minMaxApply(final double[][] x, // column vector
@@ -186,5 +195,11 @@ public class NeuralNetwork {
 		}
 
 		return sum;
+	}
+
+	private void copyColumnVector(final double[][] src, final double[][] dst) { // column vector
+		for (int i = 0; i < dst.length; i++) {
+			dst[i][0] = src[i][0];
+		}
 	}
 }
