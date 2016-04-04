@@ -75,8 +75,13 @@ public class NeuralNetwork {
 	}
 
 	public void setInputsWeights(final double[][] inputWeights) {
-		if (mInputWeights.length != inputWeights.length && mInputWeights[0].length != inputWeights[0].length) {
-			throw new IllegalArgumentException("Input weights do not fit neural network");
+		if (mInputWeights.length != inputWeights.length || mInputWeights[0].length != inputWeights[0].length) {
+			final String msg = String.format(
+					"Input weights do not fit neural network. Expected rows: %d; columns: %d. Actual rows: %d; columns: %d",
+					mInputWeights.length, mInputWeights[0].length,
+					inputWeights.length, inputWeights[0].length
+			);
+			throw new IllegalArgumentException(msg);
 		}
 
 		for (int i = 0; i < mInputWeights.length; i++) {
@@ -85,7 +90,7 @@ public class NeuralNetwork {
 	}
 
 	public void setLayerWeights(final double[][] layerWeights) {
-		if (mLayerWeights.length != layerWeights.length && mLayerWeights[0].length != layerWeights[0].length) {
+		if (mLayerWeights.length != layerWeights.length || mLayerWeights[0].length != layerWeights[0].length) {
 			throw new IllegalArgumentException("Layer weights do not fit neural network");
 		}
 
@@ -95,7 +100,7 @@ public class NeuralNetwork {
 	}
 
 	public void setXOffset(final double[][] xOffset) {  // column vector
-		if (mXOffset.length != xOffset.length && mXOffset[0].length != xOffset[0].length) {
+		if (mXOffset.length != xOffset.length || mXOffset[0].length != xOffset[0].length) {
 			throw new IllegalArgumentException("X offsets do not fit neural network");
 		}
 
@@ -103,7 +108,7 @@ public class NeuralNetwork {
 	}
 
 	public void setGain(final double[][] gain) {
-		if (mGain.length != gain.length && mGain[0].length != gain[0].length) {
+		if (mGain.length != gain.length || mGain[0].length != gain[0].length) {
 			throw new IllegalArgumentException("Gains do not fit neural network");
 		}
 
@@ -111,7 +116,7 @@ public class NeuralNetwork {
 	}
 
 	public void setInputBiases(final double[][] biases) { // column vector
-		if (mInputBiases.length != biases.length && mInputBiases[0].length != biases[0].length) {
+		if (mInputBiases.length != biases.length || mInputBiases[0].length != biases[0].length) {
 			throw new IllegalArgumentException("Input biases not fit neural network");
 		}
 
@@ -119,7 +124,7 @@ public class NeuralNetwork {
 	}
 
 	public void setLayerBiases(final double[][] biases) {
-		if (mLayerBiases.length != biases.length && mLayerBiases[0].length != biases[0].length) {
+		if (mLayerBiases.length != biases.length || mLayerBiases[0].length != biases[0].length) {
 			throw new IllegalArgumentException("Layer biases not fit neural network");
 		}
 

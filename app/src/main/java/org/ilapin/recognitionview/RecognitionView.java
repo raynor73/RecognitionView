@@ -137,7 +137,7 @@ public class RecognitionView extends View {
 			keepInputsIndexes[i] = (int) keepInputsIndexesDoubleArray[i];
 		}
 		sNeuralNetwork = new NeuralNetwork(
-				RECOGNIZED_IMAGE_ROWS * RECOGNIZED_IMAGE_COLUMNS,
+				keep[0].length,
 				inputLayerWeights.length,
 				layerWeights.length,
 				keepInputsIndexes
@@ -287,6 +287,9 @@ public class RecognitionView extends View {
 
 			final StringBuilder sb = new StringBuilder();
 			for (int i = 0; i < outputs.length; i++) {
+				if (i > 0) {
+					sb.append("|");
+				}
 				sb.append(String.format("%d: %f", i, outputs[i]));
 			}
 
